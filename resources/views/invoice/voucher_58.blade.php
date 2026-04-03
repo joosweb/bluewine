@@ -152,21 +152,6 @@ function payment_method($method)
             <br>www.osan.cl</p>
          <br>*<br>*<br>
     </div>
-@if(!empty($auto_print))
-<script>
-    window.addEventListener('load', function () {
-        window.print();
-    });
-
-    window.onafterprint = function () {
-        window.close();
-    };
-
-    setTimeout(function () {
-        window.close();
-    }, 1200);
-</script>
-@endif
 </body>
 
 </html>

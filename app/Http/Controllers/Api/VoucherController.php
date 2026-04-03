@@ -62,81 +62,8 @@ class VoucherController extends Controller
       });
     }
 
-      private function printBlockedResponse($sale, $jsonResponse)
-      {
-        if ($jsonResponse) {
-          return response()->json([
-            'status' => 'blocked',
-            'message' => 'Este voucher ya fue impreso y no se permite reimpresion.',
-            'sale_id' => $sale ? $sale->id : null,
-            'first_printed_at' => $sale ? $sale->voucher_first_printed_at : null,
-          ], 409);
-        }
-
-        return response()->view('invoice.voucher_blocked', [
-          'sale' => $sale,
-          'autoPrint' => request()->boolean('auto_print'),
-        ], 409);
-      }
-
-      private function trackVoucherPrint($id, $jsonResponse = true)
-      {
-        $sale = DB::table('sales')->where('id', $id)->first();
-
-        if (!$sale) {
-          if ($jsonResponse) {
-            return [
-              'sale' => null,
-              'response' => response()->json([
-                'status' => 'error',
-                'message' => 'No se encontro la venta asociada.',
-              ], 404),
-            ];
-          }
-
-          return [
-            'sale' => null,
-            'response' => response()->view('invoice.voucher_blocked', [
-              'sale' => null,
-              'autoPrint' => request()->boolean('auto_print'),
-            ], 404),
-          ];
-        }
-
-        $isAdmin = Auth::user()->fk_id_user_type == 1;
-        $allowReprint = $isAdmin && request()->boolean('reprint');
-        $alreadyPrinted = (int) ($sale->voucher_print_count ?? 0) > 0;
-
-        if ($alreadyPrinted && !$allowReprint) {
-          return [
-            'sale' => $sale,
-            'response' => $this->printBlockedResponse($sale, $jsonResponse),
-          ];
-        }
-
-        $authId = (int) Auth::id();
-
-        DB::table('sales')->where('id', $id)->update([
-          'voucher_print_count' => DB::raw('COALESCE(voucher_print_count, 0) + 1'),
-          'voucher_first_printed_at' => DB::raw('COALESCE(voucher_first_printed_at, NOW())'),
-          'voucher_first_printed_by' => DB::raw('COALESCE(voucher_first_printed_by, ' . $authId . ')'),
-          'voucher_last_printed_at' => now(),
-          'voucher_last_printed_by' => $authId,
-        ]);
-
-        return [
-          'sale' => DB::table('sales')->where('id', $id)->first(),
-          'response' => null,
-        ];
-      }
-
-      public function local(Request $request, $id) {
-          $printState = $this->trackVoucherPrint($id, true);
-          if ($printState['response']) {
-          return $printState['response'];
-          }
-
-          $sales = [$printState['sale']];
+    public function local($id) {
+          $sales = DB::table("sales")->where("id", $id)->get()->toArray();
           $sales_items = DB::table("sales_item")->where("fk_sales_id", $sales[0]->id)->get()->toArray();
           $photo = DB::table('users')->select('photo')->where('id', Auth::id())->first();
           $config = DB::table('page_config')->where('fk_user_id', $this->userID)->first();
@@ -218,14 +145,9 @@ class VoucherController extends Controller
        
     }
 
-    public function remota(Request $request, $id) {
+    public function remota($id) {
         try {            
-            $printState = $this->trackVoucherPrint($id, false);
-            if ($printState['response']) {
-              return $printState['response'];
-            }
-
-            $sales = [$printState['sale']];
+            $sales = DB::table("sales")->where("id", $id)->get()->toArray();
             $sales_items = DB::table("sales_item")->where("fk_sales_id", $sales[0]->id)->get()->toArray();
             $photo = DB::table('users')->select('photo')->where('id', $this->userID)->first();
             $config = DB::table('page_config')->where('fk_user_id', $this->userID)->first();
@@ -234,19 +156,6 @@ class VoucherController extends Controller
             ->get()->toArray();
 
             $shop_name_eccomerce = DB::table('page_config')->select('name_ecommerce')->where('fk_user_id', $this->userID)->first();
-
-            if ($request->boolean('print_mode')) {
-              $view = $config->continuous_paper_type === 58 ? 'invoice.voucher_58' : 'invoice.voucher_80';
-              return view($view, [
-                'sales' => $sales,
-                'sales_items' => $sales_items,
-                'shop_data' => $shop_data,
-                'shop_name_eccomerce' => $shop_name_eccomerce,
-                'photo' => $photo,
-                'config' => $config,
-                'auto_print' => $request->boolean('auto_print'),
-              ]);
-            }
 
             if($config->voucher_logo) {
               $pdfWidth  = 250 + count($sales_items) * 70;

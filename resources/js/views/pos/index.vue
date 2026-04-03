@@ -2345,23 +2345,6 @@ export default {
         }
       }
     },
-    openVoucherPrintWindow(saleId) {
-      const url =
-        '/generar-voucher-interno/' + saleId + '?print_mode=1&auto_print=1'
-      const popup = window.open(
-        url,
-        'voucher_print_' + saleId,
-        'width=460,height=760,noopener,noreferrer',
-      )
-
-      if (!popup) {
-        this.$swal.fire(
-          'Habilite las ventanas emergentes para imprimir el voucher.',
-          '',
-          'warning',
-        )
-      }
-    },
     ProcessOrder: async function () {
       if (!this.discount) {
         this.discount = 0
@@ -2384,7 +2367,20 @@ export default {
           false,
           this.typeDocument,
         )
-        this.openVoucherPrintWindow(this.id_sale)
+        this.$swal.fire({
+          //icon: 'success',
+          html:
+            '<iframe src="/generar-voucher-interno/' +
+            this.id_sale +
+            '#&zoom=180" width="100%" height="470" ></iframe>',
+          showCloseButton: false,
+          showCancelButton: false,
+          focusConfirm: false,
+          confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
+          confirmButtonAriaLabel: 'Thumbs up, great!',
+          cancelButtonText: '<i class="fa fa-thumbs-down"></i>',
+          cancelButtonAriaLabel: 'Thumbs down',
+        })
       }
       // BOLETA
       else if (this.typeDocument == 1) {
@@ -2429,7 +2425,20 @@ export default {
                   .then((data) => console.log(data))
               }
             } else {
-              this.openVoucherPrintWindow(this.id_sale)
+              this.$swal.fire({
+                //icon: 'success',
+                html:
+                  '<iframe src="/generar-voucher-interno/' +
+                  this.id_sale +
+                  '#&zoom=180" width="100%" height="650" ></iframe>',
+                showCloseButton: false,
+                showCancelButton: false,
+                focusConfirm: false,
+                confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
+                confirmButtonAriaLabel: 'Thumbs up, great!',
+                cancelButtonText: '<i class="fa fa-thumbs-down"></i>',
+                cancelButtonAriaLabel: 'Thumbs down',
+              })
             }
 
             return
@@ -2587,7 +2596,20 @@ export default {
               //.then(data => console.log(data));
             }
           } else {
-            this.openVoucherPrintWindow(this.id_sale)
+            this.$swal.fire({
+              //icon: 'success',
+              html:
+                '<iframe src="/generar-voucher-interno/' +
+                this.id_sale +
+                '#&zoom=180" width="100%" height="470" ></iframe>',
+              showCloseButton: false,
+              showCancelButton: false,
+              focusConfirm: false,
+              confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
+              confirmButtonAriaLabel: 'Thumbs up, great!',
+              cancelButtonText: '<i class="fa fa-thumbs-down"></i>',
+              cancelButtonAriaLabel: 'Thumbs down',
+            })
           }
           return
         } else {

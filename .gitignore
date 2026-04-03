@@ -6,30 +6,8 @@ Homestead.json
 Homestead.yaml
 yarn-error.log
 
-/public/hot
-/public/storage
+/public
 
-public/js/components/notification-bell.js
-
-/public/js/app_tw
-/public/js/vendors.js
-/public/js/app.js
-/public/js/app_tw.js
-/public/js/pagos_peru.js
-/public/js/ckeditor-es.js
-/public/js/broker
-/public/*.js
-
-/public/css/app.css
-/public/css/app_tw.css
-/public/css/renter.css
-/public/css/newrenter.css
-/public/css/vendor.css
-/public/mix-manifest.json
-/public/css/owner.css
-/public/css/font/*
-/public/css/broker
-/public/*/pwa/*
 *.LICENSE.txt
 /public/build
 /public/vendor
