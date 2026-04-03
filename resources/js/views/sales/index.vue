@@ -177,6 +177,7 @@
                   <td>
                     <div class="btn-group" role="group">
                     <button title="GENERAR VOUCHER" @click="GenerarVoucher(sale.id)" class="btn btn-default btn-sm mr-sm-1" type="button" name="button"><font-awesome-icon :icon="['fas', 'file-invoice']" /></button>
+                    <button v-if="IsAdmin" title="BITACORA IMPRESION" @click="ShowPrintLogs(sale.id)" class="btn btn-default btn-sm mr-sm-1" type="button" name="button"><font-awesome-icon :icon="['fas', 'history']" /></button>
                     <button title="DETALLES" @click="ModalViewSale(sale.id, sale.fk_cliente_id)" class="btn btn-default btn-sm mr-sm-1" type="button" name="button"><font-awesome-icon :icon="['fas', 'eye']" /></button>
                     <button v-if="IsAdmin" title="ELIMINAR" @click="DeleteSale(sale.id, index)" type="button" class="btn btn-default btn-sm" name="button"><font-awesome-icon :icon="['fas', 'trash']" /></button>
                   </div>
@@ -363,6 +364,89 @@
                                       <button type="button" @click="getSales" :disabled="this.bussy" class="btn btn-default btn-block"><font-awesome-icon :icon="['fas', 'redo-alt']" /></button>
                                     </div>
                                   </form>
+                                  <div class="row mb-2">
+                                    <div class="col-md-4">
+                                      <div class="alert alert-primary" style="margin-bottom:5px;">
+                                        <strong>IMPRESIONES TOTALES:</strong> {{ number_format(printMarkers.total_prints) }}
+                                      </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                      <div class="alert alert-warning" style="margin-bottom:5px;">
+                                        <strong>REIMPRESIONES:</strong> {{ number_format(printMarkers.total_reprints) }}
+                                      </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                      <div class="alert alert-info" style="margin-bottom:5px;">
+                                        <strong>VENTAS CON REIMPRESION:</strong> {{ number_format(printMarkers.sales_with_reprint) }}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div class="row mb-2" v-if="reprintDashboard.top_reprinters && reprintDashboard.top_reprinters.length">
+                                    <div class="col-md-12">
+                                      <div class="card">
+                                        <div class="card-header">TOP 5 REIMPRESIONES (USUARIOS)</div>
+                                        <div class="card-body" style="padding:10px;">
+                                          <span
+                                            v-for="(top, idx) in reprintDashboard.top_reprinters"
+                                            :key="'top-r-' + idx"
+                                            class="badge badge-default mr-1"
+                                            style="font-size:12px; padding:8px;"
+                                          >
+                                            #{{ idx + 1 }} {{ (top.user_name && top.user_name.trim()) ? top.user_name : ('ID ' + top.user_id) }}: {{ top.reprint_count }}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div class="row mb-2" v-if="reprintDashboard.user_sales && reprintDashboard.user_sales.length">
+                                    <div class="col-md-12">
+                                      <div class="card">
+                                        <div class="card-header">PERSONAS QUE REIMPRIMIERON Y BOLETAS INVOLUCRADAS</div>
+                                        <div class="card-body" style="padding:10px;">
+                                          <div class="table-responsive" style="max-height:260px; overflow:auto;">
+                                            <table class="table table-sm table-bordered" style="table-layout:fixed; font-size:12px;">
+                                              <thead>
+                                                <tr>
+                                                  <th>USUARIO</th>
+                                                  <th>BOLETA</th>
+                                                  <th>REIMP.</th>
+                                                  <th>ULTIMA</th>
+                                                  <th>ACCIONES</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                <tr v-for="s in reprintDashboard.user_sales" :key="'sale-r-' + s.user_id + '-' + s.sale_id">
+                                                  <td style="white-space:nowrap;">{{ s.user_name }}</td>
+                                                  <td>
+                                                    <button
+                                                      @click="ModalViewSale(s.sale_id, s.client_id)"
+                                                      class="btn btn-default btn-sm"
+                                                      type="button"
+                                                      :title="'Ver detalle de venta #' + s.sale_id"
+                                                    >
+                                                      {{ s.folio ? ('Folio ' + s.folio) : ('Venta #' + s.sale_id) }}
+                                                    </button>
+                                                  </td>
+                                                  <td>{{ number_format(s.reprint_events) }}</td>
+                                                  <td style="white-space:nowrap;">{{ formatLogDate(s.last_reprint_at) }}</td>
+                                                  <td>
+                                                    <button
+                                                      @click="ShowPrintLogs(s.sale_id)"
+                                                      class="btn btn-default btn-sm"
+                                                      type="button"
+                                                      :title="'Ver bitacora de venta #' + s.sale_id"
+                                                    >
+                                                      <font-awesome-icon :icon="['fas', 'history']" />
+                                                    </button>
+                                                  </td>
+                                                </tr>
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
                                   <hr>
                                   <ul class="nav nav-tabs" id="myTab" role="tablist">
                                     <li class="nav-item" role="presentation">
@@ -407,6 +491,7 @@
                                             <td>
                                               <div class="btn-group" role="group">
                                               <button title="GENERAR VOUCHER" @click="GenerarVoucher(sale.id)" class="btn btn-default btn-sm mr-sm-1" type="button" name="button"><font-awesome-icon :icon="['fas', 'file-invoice']" /></button>
+                                              <button v-if="IsAdmin" title="BITACORA IMPRESION" @click="ShowPrintLogs(sale.id)" class="btn btn-default btn-sm mr-sm-1" type="button" name="button"><font-awesome-icon :icon="['fas', 'history']" /></button>
                                               <button title="DETALLES" @click="ModalViewSale(sale.id, sale.fk_cliente_id)" class="btn btn-default btn-sm mr-sm-1" type="button" name="button"><font-awesome-icon :icon="['fas', 'eye']" /></button>
                                               <button v-if="IsAdmin" title="ELIMINAR" @click="DeleteSale(sale.id, index)" type="button" class="btn btn-default btn-sm" name="button"><font-awesome-icon :icon="['fas', 'trash']" /></button>
                                             </div>
@@ -687,6 +772,19 @@
             to: '',
             datacollection: null,
             datacollectionTwo: null,
+            printLogs: [],
+            printMarkers: {
+              total_original_prints: 0,
+              total_reprints: 0,
+              total_prints: 0,
+              sales_with_original: 0,
+              sales_with_reprint: 0,
+            },
+            reprintDashboard: {
+              top_reprinters: [],
+              users: [],
+              user_sales: [],
+            },
             options: {
               responsive: true,
     				  tooltips: {
@@ -722,32 +820,161 @@
           }
         },
         methods: {
+          getPrintSummary(filter = null, value = null, from = null, to = null) {
+            const formData = new FormData();
+            if (filter) {
+              formData.append('filter', filter);
+            }
+            if (value) {
+              formData.append('value', value);
+            }
+            if (from) {
+              formData.append('from', from);
+            }
+            if (to) {
+              formData.append('to', to);
+            }
+
+            axios.post('/sales/print/summary', formData).then((response) => {
+              this.printMarkers = response.data;
+            });
+          },
+          getReprintDashboard(filter = null, value = null, from = null, to = null) {
+            const formData = new FormData();
+            if (filter) {
+              formData.append('filter', filter);
+            }
+            if (value) {
+              formData.append('value', value);
+            }
+            if (from) {
+              formData.append('from', from);
+            }
+            if (to) {
+              formData.append('to', to);
+            }
+
+            axios.post('/sales/print/reprint-dashboard', formData).then((response) => {
+              this.reprintDashboard = response.data;
+            });
+          },
+          actionLabel(action) {
+            if (action === 'ORIGINAL') {
+              return '<span class="badge badge-success">ORIGINAL</span>';
+            }
+            if (action === 'REPRINT') {
+              return '<span class="badge badge-warning">REIMPRESION</span>';
+            }
+            return '<span class="badge badge-danger">BLOQUEADO</span>';
+          },
+          formatLogDate(value) {
+            if (!value) {
+              return '-';
+            }
+            return moment(value).format('DD/MM/YYYY HH:mm');
+          },
+          async ShowPrintLogs(saleID) {
+            try {
+              const response = await axios.get('/sales/' + saleID + '/print/logs');
+              this.printLogs = response.data.logs || [];
+
+              if (!this.printLogs.length) {
+                this.$swal.fire('Sin registros', 'Esta venta no tiene eventos de impresion.', 'info');
+                return;
+              }
+
+              let rows = '';
+              this.printLogs.forEach((log) => {
+                rows +=
+                  '<tr>' +
+                  '<td>' + this.actionLabel(log.action) + '</td>' +
+                  '<td>' + ((log.user_name && log.user_name.trim()) ? log.user_name : ('ID ' + (log.user_id || '-'))) + '</td>' +
+                  '<td>' + ((log.approved_by_name && log.approved_by_name.trim()) ? log.approved_by_name : '-') + '</td>' +
+                  '<td>' + (log.copy_number || 0) + '</td>' +
+                  '<td>' + (log.reason ? log.reason : '-') + '</td>' +
+                  '<td>' + this.formatLogDate(log.created_at) + '</td>' +
+                  '</tr>';
+              });
+
+              this.$swal.fire({
+                title: 'Bitacora de impresion - Venta #' + saleID,
+                html:
+                  '<div style="max-height:380px;overflow:auto;">' +
+                  '<table class="table table-sm table-bordered">' +
+                  '<thead><tr><th>ACCION</th><th>USUARIO</th><th>AUTORIZA</th><th>COPIA</th><th>MOTIVO</th><th>FECHA</th></tr></thead>' +
+                  '<tbody>' + rows + '</tbody>' +
+                  '</table>' +
+                  '</div>',
+                width: '860px',
+              });
+            } catch (error) {
+              const message =
+                (error.response && error.response.data && error.response.data.message) ||
+                'No se pudo obtener la bitacora de impresion.';
+              this.$swal.fire(message, '', 'error');
+            }
+          },
           GeneralConfigCharge() {
             axios.post("/general_config_get").then((response) => {
               //console.log(response);
               this.printer = response.data.printer;
             });
           },
-          GenerarVoucher(sale_id) {
-            if(this.printer === 0 || this.printer === "0") {
-              fetch('/generar-voucher-local/'+sale_id)
-                .then(response => response.json())
-                .then(data => console.log(data));
-            } else {
-              this.$swal.fire({
-              //icon: 'success',
-              html:
-                '<iframe src="/generar-voucher-interno/'+sale_id+'#&zoom=180" width="100%" height="470" ></iframe>',
-              showCloseButton: false,
-              showCancelButton: false,
-              focusConfirm: false,
-              confirmButtonText:
-                '<i class="fa fa-thumbs-up"></i> CERRAR',
-              confirmButtonAriaLabel: 'Thumbs up, great!',
-              cancelButtonText:
-                '<i class="fa fa-thumbs-down"></i>',
-              cancelButtonAriaLabel: 'Thumbs down'
-            })
+          async GenerarVoucher(sale_id) {
+            const result = await this.$swal.fire({
+              title: 'Motivo de reimpresion',
+              input: 'text',
+              inputPlaceholder: 'Ejemplo: cliente solicita copia',
+              showCancelButton: true,
+              confirmButtonText: 'Reimprimir',
+              cancelButtonText: 'Cancelar',
+            });
+
+            if (!result.isConfirmed) {
+              return;
+            }
+
+            const reason = (result.value || '').trim();
+            if (!reason) {
+              this.$swal.fire('Debe ingresar un motivo para reimprimir.', '', 'warning');
+              return;
+            }
+
+            try {
+              const response = await axios.post('/sales/' + sale_id + '/print/reprint-execute', {
+                reason: reason,
+                source: 'ADMIN_PANEL',
+              });
+
+              if (response.data.agent_dispatched) {
+                this.$swal.fire('Reimpresion enviada a impresora local', '', 'success');
+                return;
+              }
+              if (response.data.agent_attempted) {
+                this.$swal.fire(response.data.agent_message || 'No se pudo enviar a impresora local', '', 'error');
+                return;
+              }
+
+              if(this.printer === 0 || this.printer === '0') {
+                await fetch(response.data.local_url).then(r => r.json());
+                this.$swal.fire('Reimpresion enviada a impresora', '', 'success');
+              } else {
+                this.$swal.fire({
+                  html:
+                    '<iframe src="' + response.data.preview_url + '#&zoom=180" width="100%" height="470" ></iframe>',
+                  showCloseButton: false,
+                  showCancelButton: false,
+                  focusConfirm: false,
+                  confirmButtonText:
+                    '<i class="fa fa-thumbs-up"></i> CERRAR',
+                  confirmButtonAriaLabel: 'Thumbs up, great!'
+                })
+              }
+            } catch (error) {
+              const message = (error.response && error.response.data && error.response.data.message)
+                ? error.response.data.message
+                : 'No fue posible ejecutar la reimpresion.';
+              this.$swal.fire(message, '', 'error');
             }
           },
           formReset() {
@@ -812,6 +1039,8 @@
               this.sales = response.data;
               this.bussy = false;
             });
+            this.getPrintSummary();
+            this.getReprintDashboard();
           },
           type_document(documentID){
             if(documentID == 1){
@@ -969,6 +1198,8 @@
               axios.post('/sales/get/filters?page='+page, formData)
               .then(response => {
                 console.log(response);
+                this.getPrintSummary(this.filter, this.inputValue, this.from, this.to);
+                this.getReprintDashboard(this.filter, this.inputValue, this.from, this.to);
                 if(response.data.table.total == 0){
                   this.sales = {};
                   this.withoutResults = true;

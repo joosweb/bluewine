@@ -122,6 +122,8 @@ Route::post('/get/plan', 'Api\PlansController@index');
 Route::post('/sales', 'Api\SalesController@store');
 Route::post('/sales/get', 'Api\SalesController@index');
 Route::post('/sales/get/filters', 'Api\SalesController@show');
+Route::post('/sales/print/summary', 'Api\SalesController@printSummary');
+Route::post('/sales/print/reprint-dashboard', 'Api\SalesController@reprintDashboard');
 Route::post('/sales/details/{id}', 'Api\SalesController@saleDetails');
 //Route::post('/sales/items', 'Api\SalesController@items');
 Route::delete('/sales/delete/{id}', 'Api\SalesController@destroy');
@@ -189,6 +191,9 @@ Route::get('/users', 'Api\UserController@listUsers');
 
 Route::get("/generar-voucher-interno/{id}", "Api\VoucherController@remota");
 Route::get("/generar-voucher-local/{id}", "Api\VoucherController@local");
+Route::post('/sales/{sale}/print/original', 'Api\VoucherController@printOriginal');
+Route::post('/sales/{sale}/print/reprint-execute', 'Api\VoucherController@reprintExecute');
+Route::get('/sales/{sale}/print/logs', 'Api\VoucherController@logs');
 
 Route::get('/{vue_capture?}', function () {
     return view('welcome');

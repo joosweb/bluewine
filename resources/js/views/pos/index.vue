@@ -2367,20 +2367,7 @@ export default {
           false,
           this.typeDocument,
         )
-        this.$swal.fire({
-          //icon: 'success',
-          html:
-            '<iframe src="/generar-voucher-interno/' +
-            this.id_sale +
-            '#&zoom=180" width="100%" height="470" ></iframe>',
-          showCloseButton: false,
-          showCancelButton: false,
-          focusConfirm: false,
-          confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
-          confirmButtonAriaLabel: 'Thumbs up, great!',
-          cancelButtonText: '<i class="fa fa-thumbs-down"></i>',
-          cancelButtonAriaLabel: 'Thumbs down',
-        })
+        await this.handleOriginalPrintFlow('470')
       }
       // BOLETA
       else if (this.typeDocument == 1) {
@@ -2410,36 +2397,7 @@ export default {
             this.search = ''
             this.$emit('clear')
             this.SearchClear()
-            if (this.printer === 0) {
-              if (this.optional_printer === 0) {
-                this.$swal.fire({
-                  position: 'top-center',
-                  icon: 'success',
-                  title: 'Venta Procesada',
-                  showConfirmButton: false,
-                  timer: 1500,
-                })
-              } else {
-                fetch('/generar-voucher-local/' + this.id_sale)
-                  .then((response) => response.json())
-                  .then((data) => console.log(data))
-              }
-            } else {
-              this.$swal.fire({
-                //icon: 'success',
-                html:
-                  '<iframe src="/generar-voucher-interno/' +
-                  this.id_sale +
-                  '#&zoom=180" width="100%" height="650" ></iframe>',
-                showCloseButton: false,
-                showCancelButton: false,
-                focusConfirm: false,
-                confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
-                confirmButtonAriaLabel: 'Thumbs up, great!',
-                cancelButtonText: '<i class="fa fa-thumbs-down"></i>',
-                cancelButtonAriaLabel: 'Thumbs down',
-              })
-            }
+            await this.handleOriginalPrintFlow('650')
 
             return
           } else {
@@ -2580,37 +2538,7 @@ export default {
           this.search = ''
           this.$emit('clear')
           this.SearchClear()
-          if (this.printer === 0) {
-            if (this.optional_printer === 0) {
-              this.$swal.fire({
-                position: 'top-center',
-                icon: 'success',
-                title: 'Venta Procesada',
-                showConfirmButton: false,
-                timer: 1500,
-              })
-            } else {
-              fetch('/generar-voucher-local/' + this.id_sale).then((response) =>
-                response.json(),
-              )
-              //.then(data => console.log(data));
-            }
-          } else {
-            this.$swal.fire({
-              //icon: 'success',
-              html:
-                '<iframe src="/generar-voucher-interno/' +
-                this.id_sale +
-                '#&zoom=180" width="100%" height="470" ></iframe>',
-              showCloseButton: false,
-              showCancelButton: false,
-              focusConfirm: false,
-              confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
-              confirmButtonAriaLabel: 'Thumbs up, great!',
-              cancelButtonText: '<i class="fa fa-thumbs-down"></i>',
-              cancelButtonAriaLabel: 'Thumbs down',
-            })
-          }
+          await this.handleOriginalPrintFlow('470')
           return
         } else {
           await axios({
@@ -2680,6 +2608,75 @@ export default {
             this.$swal.fire(msgError, '', 'error')
           }
         }
+      }
+    },
+    async handleOriginalPrintFlow(previewHeight = '470') {
+      try {
+        const response = await axios.post('/sales/' + this.id_sale + '/print/original', {
+          source: 'POS_AUTO',
+        })
+
+        const data = response.data
+        if (data.agent_dispatched) {
+          this.$swal.fire({
+            position: 'top-center',
+            icon: 'success',
+            title: 'Voucher enviado a impresora local',
+            showConfirmButton: false,
+            timer: 1500,
+          })
+          return
+        }
+        if (data.agent_attempted) {
+          this.$swal.fire(
+            data.agent_message || 'No se pudo enviar el voucher a la impresora local.',
+            '',
+            'error',
+          )
+          return
+        }
+
+        if (this.printer === 0 || this.printer === '0') {
+          if (this.optional_printer === 0 || this.optional_printer === '0') {
+            this.$swal.fire({
+              position: 'top-center',
+              icon: 'success',
+              title: 'Venta Procesada',
+              showConfirmButton: false,
+              timer: 1500,
+            })
+            return
+          }
+
+          await fetch(data.local_url).then((r) => r.json())
+          this.$swal.fire({
+            position: 'top-center',
+            icon: 'success',
+            title: 'Voucher enviado a impresora',
+            showConfirmButton: false,
+            timer: 1500,
+          })
+          return
+        }
+
+        this.$swal.fire({
+          html:
+            '<iframe src="' +
+            data.preview_url +
+            '#&zoom=180" width="100%" height="' +
+            previewHeight +
+            '" ></iframe>',
+          showCloseButton: false,
+          showCancelButton: false,
+          focusConfirm: false,
+          confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
+          confirmButtonAriaLabel: 'Thumbs up, great!',
+        })
+      } catch (error) {
+        const message =
+          (error.response && error.response.data && error.response.data.message) ||
+          'No fue posible imprimir el voucher.'
+        this.$swal.fire(message, '', 'error')
       }
     },
     insertSales: async function (

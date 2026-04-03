@@ -715,21 +715,58 @@ export default {
     },
   },
   methods: {
-    GenerarVoucher(sale_id) {
-      this.$swal.fire({
-        //icon: 'success',
-        html:
-          '<iframe src="/generar-voucher-interno/' +
-          sale_id +
-          '#&zoom=180" width="100%" height="470" ></iframe>',
-        showCloseButton: false,
-        showCancelButton: false,
-        focusConfirm: false,
-        confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
-        confirmButtonAriaLabel: "Thumbs up, great!",
-        cancelButtonText: '<i class="fa fa-thumbs-down"></i>',
-        cancelButtonAriaLabel: "Thumbs down",
+    async GenerarVoucher(sale_id) {
+      const result = await this.$swal.fire({
+        title: 'Motivo de reimpresion',
+        input: 'text',
+        inputPlaceholder: 'Ejemplo: reposicion por papel defectuoso',
+        showCancelButton: true,
+        confirmButtonText: 'Reimprimir',
+        cancelButtonText: 'Cancelar',
       });
+
+      if (!result.isConfirmed) {
+        return;
+      }
+
+      const reason = (result.value || '').trim();
+      if (!reason) {
+        this.$swal.fire('Debe ingresar un motivo para reimprimir.', '', 'warning');
+        return;
+      }
+
+      try {
+        const response = await axios.post('/sales/' + sale_id + '/print/reprint-execute', {
+          reason: reason,
+          source: 'ADMIN_PANEL',
+        });
+
+        if (response.data.agent_dispatched) {
+          this.$swal.fire('Reimpresion enviada a impresora local', '', 'success');
+          return;
+        }
+        if (response.data.agent_attempted) {
+          this.$swal.fire(response.data.agent_message || 'No se pudo enviar a impresora local', '', 'error');
+          return;
+        }
+
+        this.$swal.fire({
+          html:
+            '<iframe src="' +
+            response.data.preview_url +
+            '#&zoom=180" width="100%" height="470" ></iframe>',
+          showCloseButton: false,
+          showCancelButton: false,
+          focusConfirm: false,
+          confirmButtonText: '<i class="fa fa-thumbs-up"></i> CERRAR',
+          confirmButtonAriaLabel: 'Thumbs up, great!',
+        });
+      } catch (error) {
+        const message =
+          (error.response && error.response.data && error.response.data.message) ||
+          'No fue posible ejecutar la reimpresion.';
+        this.$swal.fire(message, '', 'error');
+      }
     },
     totalpurchases() {
       axios.post("/total_purchases").then((response) => {

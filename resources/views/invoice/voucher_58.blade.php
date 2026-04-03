@@ -92,14 +92,28 @@ function payment_method($method)
         body {
             text-align: center;
         }
+
+        .watermark {
+            font-size: 28px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.2);
+            transform: rotate(-25deg);
+            position: fixed;
+            top: 45%;
+            left: 6%;
+            z-index: -1;
+        }
     </style>
 </head>
 
 <body>
+@if(!empty($printMeta['is_reprint']))
+    <div class="watermark">REIMPRESION</div>
+@endif
 <div class="ticket centrado">
         @if($config->voucher_logo)
         <div class="logo">
-          <img src="{{asset($photo->photo)}}" width="130" alt="">
+                    <img src="{{ $photoSrc ?: asset($photo->photo) }}" width="130" alt="">
           <!-- <img src="{{$photo->photo}}" alt=""> -->
         </div>
         @endif
@@ -150,6 +164,14 @@ function payment_method($method)
         </table>
         <p class="centrado" style="margin-top:10px">¡GRACIAS POR SU COMPRA!
             <br>www.osan.cl</p>
+        @if(!empty($printMeta['is_reprint']))
+            <p class="centrado" style="margin-top:5px; font-size:10px;">
+                COPIA {{ $printMeta['copy_number'] ?? 0 }}<br>
+                IMPRESO POR: {{ mb_strtoupper($printMeta['printed_by'] ?? 'N/A') }}<br>
+                FECHA: {{ $printMeta['printed_at'] ?? '' }}<br>
+                MOTIVO: {{ mb_strtoupper($printMeta['reason'] ?? '') }}
+            </p>
+        @endif
          <br>*<br>*<br>
     </div>
 </body>

@@ -4,7 +4,7 @@
   <div class="ks-wrapper ks-sidebar-wrapper">
       <ul class="nav nav-pills nav-stacked">
         <li class="nav-item ks-user dropdown">
-            <a class="nav-link dropdown-toggle"  href="#" role="button" aria-haspopup="true" aria-expanded="false">
+            <a class="nav-link dropdown-toggle"  href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
                 <img :src="'/'+userphoto" width="36" height="36" class="ks-avatar rounded-circle">
                 <div class="ks-info">
                     <div class="ks-name">{{ username }}</div>
@@ -26,7 +26,7 @@
             <span>INICIO</span></router-link>
           </li>
           <li class="nav-item dropdown" v-if="isAdmin">
-              <a  class="nav-link dropdown-toggle"  href="#" role="button" aria-haspopup="true" aria-expanded="false">
+              <a  class="nav-link dropdown-toggle"  href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
                   <span class="la la-user ks-icon"></span>
                   <span>USUARIOS</span>
               </a>
@@ -40,7 +40,7 @@
               </div>
           </li>
           <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle"  href="#" role="button" aria-haspopup="true" aria-expanded="false">
+              <a class="nav-link dropdown-toggle"  href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
                   <span class="ks-icon la la-cart-arrow-down"></span>
                   <span>PUNTO DE VENTA</span>
               </a>
@@ -54,7 +54,7 @@
               </div>
           </li>
           <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle"  href="#" role="button" aria-haspopup="true" aria-expanded="false">
+              <a class="nav-link dropdown-toggle"  href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
                   <span class="ks-icon la la-bar-chart-o"></span>
                   <span>REPORTES</span>
               </a>

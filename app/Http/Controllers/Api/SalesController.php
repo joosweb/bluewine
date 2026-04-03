@@ -317,6 +317,173 @@ class SalesController extends Controller
       );
   }
 
+  public function printSummary(Request $request)
+  {
+    $query = DB::table('sales as T1');
+
+    $filter = $request->get('filter');
+    $value = $request->get('value');
+    $from = $request->get('from');
+    $to = $request->get('to');
+
+    if ($value && $filter) {
+      $query->where($filter, 'LIKE', '%' . $value . '%');
+    }
+
+    if ($from && $to) {
+      $query->whereBetween('T1.created_at', [$from, $to]);
+    }
+
+    if (Auth::user()->fk_id_user_type == 1) {
+      $query->where('T1.fk_shop_id', Auth::user()->shop);
+    } else {
+      $query->where('T1.fk_user_id', Auth::id());
+    }
+
+    $totalOriginalPrints = (int) (clone $query)->sum('T1.print_original_count');
+    $totalReprints = (int) (clone $query)->sum('T1.reprint_count');
+    $salesWithOriginal = (int) (clone $query)->where('T1.print_original_count', '>', 0)->count();
+    $salesWithReprint = (int) (clone $query)->where('T1.reprint_count', '>', 0)->count();
+
+    return response()->json([
+      'total_original_prints' => $totalOriginalPrints,
+      'total_reprints' => $totalReprints,
+      'total_prints' => $totalOriginalPrints + $totalReprints,
+      'sales_with_original' => $salesWithOriginal,
+      'sales_with_reprint' => $salesWithReprint,
+    ]);
+  }
+
+  public function reprintDashboard(Request $request)
+  {
+    $filter = $request->get('filter');
+    $value = $request->get('value');
+    $from = $request->get('from');
+    $to = $request->get('to');
+
+    $baseQuery = DB::table('voucher_print_logs as vpl')
+      ->join('sales as s', 'vpl.sale_id', '=', 's.id')
+      ->leftJoin('users as u', 'vpl.user_id', '=', 'u.id')
+      ->where('vpl.action', 'REPRINT');
+
+    if ($value && $filter) {
+      if ($filter === 'T1.folio') {
+        $baseQuery->where('s.folio', 'LIKE', '%' . $value . '%');
+      }
+    }
+
+    if ($from && $to) {
+      $baseQuery->whereBetween('s.created_at', [$from, $to]);
+    }
+
+    if (Auth::user()->fk_id_user_type == 1) {
+      $baseQuery->where('s.fk_shop_id', Auth::user()->shop);
+    } else {
+      $baseQuery->where('s.fk_user_id', Auth::id());
+    }
+
+    $topReprinters = (clone $baseQuery)
+      ->select(
+        'vpl.user_id',
+        DB::raw("CONCAT(COALESCE(u.name, ''), ' ', COALESCE(u.last_name, '')) as user_name"),
+        DB::raw('COUNT(vpl.id) as reprint_count')
+      )
+      ->groupBy('vpl.user_id', 'u.name', 'u.last_name')
+      ->orderBy('reprint_count', 'DESC')
+      ->limit(5)
+      ->get();
+
+    $salesByUser = (clone $baseQuery)
+      ->select(
+        'vpl.user_id',
+        DB::raw("CONCAT(COALESCE(u.name, ''), ' ', COALESCE(u.last_name, '')) as user_name"),
+        's.id as sale_id',
+        's.fk_cliente_id',
+        's.folio',
+        DB::raw('COUNT(vpl.id) as reprint_events'),
+        DB::raw('MAX(vpl.created_at) as last_reprint_at')
+      )
+      ->groupBy('vpl.user_id', 'u.name', 'u.last_name', 's.id', 's.fk_cliente_id', 's.folio')
+      ->orderBy('last_reprint_at', 'DESC')
+      ->get();
+
+    $saleIds = [];
+    foreach ($salesByUser as $row) {
+      $saleIds[] = (int) $row->sale_id;
+    }
+
+    $productsBySale = [];
+    if (count($saleIds) > 0) {
+      $productRows = DB::table('sales_item')
+        ->select(
+          'fk_sales_id',
+          DB::raw('COUNT(*) as lines_count'),
+          DB::raw('GROUP_CONCAT(DISTINCT name_item ORDER BY name_item SEPARATOR " | ") as products')
+        )
+        ->whereIn('fk_sales_id', $saleIds)
+        ->groupBy('fk_sales_id')
+        ->get();
+
+      foreach ($productRows as $p) {
+        $productsBySale[(int) $p->fk_sales_id] = [
+          'lines_count' => (int) $p->lines_count,
+          'products' => $p->products,
+        ];
+      }
+    }
+
+    $users = [];
+    $userSalesRows = [];
+    foreach ($salesByUser as $row) {
+      $key = (string) $row->user_id;
+      if (!isset($users[$key])) {
+        $users[$key] = [
+          'user_id' => $row->user_id,
+          'user_name' => trim($row->user_name) !== '' ? $row->user_name : ('ID ' . $row->user_id),
+          'total_reprints' => 0,
+          'sales' => [],
+        ];
+      }
+
+      $users[$key]['total_reprints'] += (int) $row->reprint_events;
+
+      $productData = isset($productsBySale[(int) $row->sale_id]) ? $productsBySale[(int) $row->sale_id] : ['lines_count' => 0, 'products' => ''];
+
+      $users[$key]['sales'][] = [
+        'sale_id' => (int) $row->sale_id,
+        'client_id' => $row->fk_cliente_id,
+        'folio' => $row->folio,
+        'reprint_events' => (int) $row->reprint_events,
+        'last_reprint_at' => $row->last_reprint_at,
+        'products' => $productData['products'],
+        'lines_count' => $productData['lines_count'],
+      ];
+
+      $userSalesRows[] = [
+        'user_id' => $row->user_id,
+        'user_name' => trim($row->user_name) !== '' ? $row->user_name : ('ID ' . $row->user_id),
+        'sale_id' => (int) $row->sale_id,
+        'client_id' => $row->fk_cliente_id,
+        'folio' => $row->folio,
+        'reprint_events' => (int) $row->reprint_events,
+        'last_reprint_at' => $row->last_reprint_at,
+        'products' => $productData['products'],
+        'lines_count' => $productData['lines_count'],
+      ];
+    }
+
+    $users = array_values($users);
+    usort($users, function ($a, $b) {
+      return $b['total_reprints'] <=> $a['total_reprints'];
+    });
+
+    return response()->json([
+      'top_reprinters' => $topReprinters,
+      'users' => $users,
+      'user_sales' => $userSalesRows,
+    ]);
+  }
+
   public function saleDetails($saleID) {
     $query = DB::table('sales_item')
     ->where('fk_sales_id', $saleID)
