@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Mike42\Escpos\Printer;
 use Mike42\Escpos\EscposImage;
+use Mike42\Escpos\PrintConnectors\FilePrintConnector;
 use Mike42\Escpos\PrintConnectors\WindowsPrintConnector;
 use Date;
 use Auth;
@@ -411,9 +412,14 @@ class VoucherController extends Controller
       $previewToken = $this->buildPrintGrant($saleId, 'original', 'POS_AUTO', null, 0);
       $localToken = $this->buildPrintGrant($saleId, 'original', 'POS_AUTO', null, 0);
 
-      $agentAttempted = $this->localPrintAgentService->isEnabled();
+      $agentEnabled = $this->localPrintAgentService->isEnabled();
+      $agentClientMode = $agentEnabled && $this->localPrintAgentService->isClientDispatch();
+      $agentAttempted = $agentEnabled && !$agentClientMode;
+
       $agentResult = ['ok' => false, 'message' => 'not attempted'];
-      if ($agentAttempted) {
+      $clientPrint = null;
+
+      if ($agentEnabled) {
         try {
           $data = $this->buildVoucherData($saleId);
           $printMeta = [
@@ -423,12 +429,23 @@ class VoucherController extends Controller
             'printed_by' => Auth::user()->name . ' ' . Auth::user()->last_name,
             'printed_at' => Date::now()->format('Y-m-d H:i:s'),
           ];
+
           if ($this->localPrintAgentService->mode() === 'pdf') {
-            $pdfBinary = $this->buildVoucherPdfBinary($data, $printMeta);
-            $agentResult = $this->localPrintAgentService->dispatchPdf($pdfBinary, 'voucher-' . $saleId . '.pdf', 1);
+            $binary = $this->buildVoucherPdfBinary($data, $printMeta);
+            $filename = 'voucher-' . $saleId . '.pdf';
           } else {
-            $rawPayload = $this->buildEscPosPayload($data, $printMeta);
-            $agentResult = $this->localPrintAgentService->dispatchRaw($rawPayload, 'voucher-' . $saleId . '.bin', 1);
+            $binary = $this->buildEscPosPayload($data, $printMeta);
+            $filename = 'voucher-' . $saleId . '.bin';
+          }
+
+          if ($agentClientMode) {
+            $clientPrint = $this->localPrintAgentService->buildClientPayload($binary, $filename, 1);
+          } else {
+            if ($this->localPrintAgentService->mode() === 'pdf') {
+              $agentResult = $this->localPrintAgentService->dispatchPdf($binary, $filename, 1);
+            } else {
+              $agentResult = $this->localPrintAgentService->dispatchRaw($binary, $filename, 1);
+            }
           }
         } catch (\Exception $e) {
           $agentResult = ['ok' => false, 'message' => $e->getMessage()];
@@ -443,6 +460,7 @@ class VoucherController extends Controller
         'agent_dispatched' => (bool) ($agentResult['ok'] ?? false),
         'agent_message' => $agentResult['message'] ?? null,
         'agent_job_id' => $agentResult['job_id'] ?? null,
+        'client_print' => $clientPrint,
       ]);
     }
 
@@ -468,9 +486,14 @@ class VoucherController extends Controller
       $previewToken = $this->buildPrintGrant($saleId, 'reprint', 'ADMIN_PANEL', $reason, $result['copy_number']);
       $localToken = $this->buildPrintGrant($saleId, 'reprint', 'ADMIN_PANEL', $reason, $result['copy_number']);
 
-      $agentAttempted = $this->localPrintAgentService->isEnabled();
+      $agentEnabled = $this->localPrintAgentService->isEnabled();
+      $agentClientMode = $agentEnabled && $this->localPrintAgentService->isClientDispatch();
+      $agentAttempted = $agentEnabled && !$agentClientMode;
+
       $agentResult = ['ok' => false, 'message' => 'not attempted'];
-      if ($agentAttempted) {
+      $clientPrint = null;
+
+      if ($agentEnabled) {
         try {
           $data = $this->buildVoucherData($saleId);
           $printMeta = [
@@ -480,12 +503,23 @@ class VoucherController extends Controller
             'printed_by' => Auth::user()->name . ' ' . Auth::user()->last_name,
             'printed_at' => Date::now()->format('Y-m-d H:i:s'),
           ];
+
           if ($this->localPrintAgentService->mode() === 'pdf') {
-            $pdfBinary = $this->buildVoucherPdfBinary($data, $printMeta);
-            $agentResult = $this->localPrintAgentService->dispatchPdf($pdfBinary, 'voucher-reprint-' . $saleId . '.pdf', 1);
+            $binary = $this->buildVoucherPdfBinary($data, $printMeta);
+            $filename = 'voucher-reprint-' . $saleId . '.pdf';
           } else {
-            $rawPayload = $this->buildEscPosPayload($data, $printMeta);
-            $agentResult = $this->localPrintAgentService->dispatchRaw($rawPayload, 'voucher-reprint-' . $saleId . '.bin', 1);
+            $binary = $this->buildEscPosPayload($data, $printMeta);
+            $filename = 'voucher-reprint-' . $saleId . '.bin';
+          }
+
+          if ($agentClientMode) {
+            $clientPrint = $this->localPrintAgentService->buildClientPayload($binary, $filename, 1);
+          } else {
+            if ($this->localPrintAgentService->mode() === 'pdf') {
+              $agentResult = $this->localPrintAgentService->dispatchPdf($binary, $filename, 1);
+            } else {
+              $agentResult = $this->localPrintAgentService->dispatchRaw($binary, $filename, 1);
+            }
           }
         } catch (\Exception $e) {
           $agentResult = ['ok' => false, 'message' => $e->getMessage()];
@@ -500,6 +534,7 @@ class VoucherController extends Controller
         'agent_dispatched' => (bool) ($agentResult['ok'] ?? false),
         'agent_message' => $agentResult['message'] ?? null,
         'agent_job_id' => $agentResult['job_id'] ?? null,
+        'client_print' => $clientPrint,
       ]);
     }
 
@@ -519,11 +554,13 @@ class VoucherController extends Controller
     }
 
     public function local($id, Request $request) {
+      \Log::channel('single')->info('[VoucherLocal] Inicio', ['sale_id' => $id, 'mode' => $request->get('mode')]);
       try {
           $mode = $request->get('mode', 'original');
           $grant = $this->consumePrintGrant($request->get('print_token'), $id, $mode);
 
           if (!$grant) {
+            \Log::channel('single')->warning('[VoucherLocal] Token invalido', ['sale_id' => $id]);
             return response()->json(['status' => 'ERROR', 'message' => 'Token de impresion invalido o expirado.'], 403);
           }
 
@@ -535,7 +572,9 @@ class VoucherController extends Controller
           $shop_data = $data['shop_data'];
           $printMeta = $this->printMetaFromGrant($grant);
 
-          $connector = new WindowsPrintConnector($config->printer_name);
+          \Log::channel('single')->info('[VoucherLocal] Generando ESC/POS', ['sale_id' => $id, 'printer_name' => $config->printer_name ?? 'N/A']);
+          ob_start();
+          $connector = new FilePrintConnector('php://output');
           $printer = new Printer($connector);
 
           $items = [];
@@ -548,9 +587,13 @@ class VoucherController extends Controller
           $total = new item('TOTAL', number_format($sales[0]->amount - $disc), true);
 
           if ($config->voucher_logo) {
-            $printer->setJustification(Printer::JUSTIFY_CENTER);
-            $tux = EscposImage::load($photo->photo, false);
-            $printer->bitImageColumnFormat($tux);
+            try {
+              $printer->setJustification(Printer::JUSTIFY_CENTER);
+              $tux = EscposImage::load($photo->photo, false);
+              $printer->bitImageColumnFormat($tux);
+            } catch (\Exception $logoEx) {
+              \Log::channel('single')->warning('[VoucherLocal] Logo omitido', ['sale_id' => $id, 'error' => $logoEx->getMessage()]);
+            }
           }
 
           $printer->setJustification(Printer::JUSTIFY_CENTER);
@@ -600,9 +643,51 @@ class VoucherController extends Controller
 
           $printer->cut();
           $printer->close();
+
+          $escposBytes = ob_get_clean();
+          \Log::channel('single')->info('[VoucherLocal] ESC/POS generado', ['sale_id' => $id, 'bytes' => strlen($escposBytes)]);
+
+          /** @var LocalPrintAgentService $printAgent */
+          $printAgent = app(LocalPrintAgentService::class);
+
+          \Log::channel('single')->info('[VoucherLocal] Preparando envio al agente', [
+              'sale_id' => $id,
+              'enabled' => $printAgent->isEnabled(),
+              'mode' => $printAgent->mode(),
+              'dispatch' => $printAgent->dispatchMode(),
+          ]);
+
+          // Cuando dispatch=client, el navegador es quien hace el POST al agente.
+          // Devolvemos el payload base64 y dejamos que el front lo despache.
+          if ($printAgent->isClientDispatch()) {
+              $clientPrint = $printAgent->buildClientPayload($escposBytes, 'voucher-' . $id . '.bin', 1);
+              if ($clientPrint === null) {
+                  return response()->json(['status' => 'ERROR', 'message' => 'Agente de impresion deshabilitado.'], 500);
+              }
+              return response()->json([
+                  'printer' => 'CLIENT_DISPATCH',
+                  'client_print' => $clientPrint,
+              ]);
+          }
+
+          $result = $printAgent->dispatchRaw($escposBytes, 'voucher-' . $id . '.bin');
+
+          \Log::channel('single')->info('[VoucherLocal] Respuesta agente', ['sale_id' => $id, 'result' => $result]);
+
+          if (!$result['ok']) {
+              return response()->json(['status' => 'ERROR', 'message' => $result['message'] ?? 'No se pudo enviar al agente de impresion.'], 500);
+          }
+
           return response()->json(['printer' => 'OK']);
       } catch (\Exception $e) {
-          return response()->json(['status' => 'ERROR', 'message' => 'No se pudo imprimir el voucher.'], 500);
+          \Log::channel('single')->error('[VoucherLocal] Exception', [
+              'sale_id' => $id,
+              'error' => $e->getMessage(),
+              'file' => $e->getFile(),
+              'line' => $e->getLine(),
+              'trace' => $e->getTraceAsString(),
+          ]);
+          return response()->json(['status' => 'ERROR', 'message' => $e->getMessage()], 500);
       }
     }
 

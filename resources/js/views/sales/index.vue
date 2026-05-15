@@ -734,6 +734,7 @@
     import moment from 'moment'
     import VueSweetalert2 from 'vue-sweetalert2';
     import $ from 'jquery'
+    import { dispatchClientPrint } from '../../utils/printAgent';
     Vue.use(VueSweetalert2);
 
     export default {
@@ -946,6 +947,16 @@
                 source: 'ADMIN_PANEL',
               });
 
+              if (response.data.client_print) {
+                try {
+                  await dispatchClientPrint(response.data.client_print);
+                  this.$swal.fire('Reimpresion enviada a impresora local', '', 'success');
+                } catch (err) {
+                  this.$swal.fire(err.message || 'No se pudo imprimir en el agente local.', '', 'error');
+                }
+                return;
+              }
+
               if (response.data.agent_dispatched) {
                 this.$swal.fire('Reimpresion enviada a impresora local', '', 'success');
                 return;
@@ -956,7 +967,15 @@
               }
 
               if(this.printer === 0 || this.printer === '0') {
-                await fetch(response.data.local_url).then(r => r.json());
+                const legacy = await fetch(response.data.local_url).then(r => r.json());
+                if (legacy && legacy.client_print) {
+                  try {
+                    await dispatchClientPrint(legacy.client_print);
+                  } catch (err) {
+                    this.$swal.fire(err.message || 'No se pudo imprimir en el agente local.', '', 'error');
+                    return;
+                  }
+                }
                 this.$swal.fire('Reimpresion enviada a impresora', '', 'success');
               } else {
                 this.$swal.fire({

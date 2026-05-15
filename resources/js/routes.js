@@ -36,6 +36,11 @@ const router = new Router({
 			component: require('./views/expenses/index').default
 		},
 		{
+			path: '/products-report',
+			name: 'products-report',
+			component: require('./views/products-report/index').default
+		},
+		{
 			path: '/boxs',
 			name: 'boxs',
 			component: require('./views/boxs/index').default

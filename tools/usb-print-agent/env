@@ -1,0 +1,7 @@
+PRINT_AGENT_LISTEN="127.0.0.1:8765"
+PRINT_AGENT_PRINTER="NATIONS_CLA58"
+PRINT_AGENT_TOKEN="secret-local"
+
+# Origen permitido para CORS. Pon el dominio de Bluewine en hosting.
+# Acepta lista separada por comas. Usa "*" solo para pruebas.
+PRINT_AGENT_CORS_ORIGIN="https://app.bluewine.cl"

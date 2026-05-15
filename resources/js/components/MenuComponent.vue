@@ -65,6 +65,8 @@
                   <span>VENTAS</span></router-link>
                   <router-link class="dropdown-item" to="/expenses"><span class="ks-icon la la-th-list"></span>
                   <span>GASTOS</span></router-link>
+                  <router-link class="dropdown-item" to="/products-report"><span class="ks-icon la la-cube"></span>
+                  <span>PRODUCTOS</span></router-link>
                   <router-link class="dropdown-item" to="/boxs"><span class="ks-icon la la-cash-register"></span>
                   <span>CAJA</span></router-link>
               </div>

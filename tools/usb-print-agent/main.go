@@ -5,12 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,10 +16,11 @@ import (
 )
 
 type appConfig struct {
-	ListenAddr string
-	Token      string
-	Printer    string
-	LPPath     string
+	ListenAddr  string
+	Token       string
+	Printer     string
+	LPPath      string
+	CorsOrigin  string
 }
 
 type printRequest struct {
@@ -40,10 +39,11 @@ func main() {
 	loadDotEnv(".env")
 
 	cfg := appConfig{
-		ListenAddr: envOrDefault("PRINT_AGENT_LISTEN", "127.0.0.1:8765"),
+		ListenAddr: envOrDefault("PRINT_AGENT_LISTEN", "0.0.0.0:8765"),
 		Token:      strings.TrimSpace(os.Getenv("PRINT_AGENT_TOKEN")),
 		Printer:    strings.TrimSpace(os.Getenv("PRINT_AGENT_PRINTER")),
 		LPPath:     envOrDefault("PRINT_AGENT_LP_PATH", "lp"),
+		CorsOrigin: envOrDefault("PRINT_AGENT_CORS_ORIGIN", "*"),
 	}
 
 	mux := http.NewServeMux()
@@ -58,7 +58,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           loggingMiddleware(mux),
+		Handler:           corsMiddleware(loggingMiddleware(mux), cfg.CorsOrigin),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -140,28 +140,7 @@ func (cfg appConfig) handlePrint(defaultExt string, rawMode bool) http.HandlerFu
 func (cfg appConfig) sendToPrinter(ctx context.Context, filePath string, copies int, rawMode bool) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-
-	args := []string{}
-	if cfg.Printer != "" {
-		args = append(args, "-d", cfg.Printer)
-	}
-	args = append(args, "-n", fmt.Sprintf("%d", copies))
-	if rawMode {
-		args = append(args, "-o", "raw")
-	}
-	args = append(args, filePath)
-
-	cmd := exec.CommandContext(ctx, cfg.LPPath, args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("lp failed: %s", strings.TrimSpace(string(out)))
-	}
-
-	result := strings.TrimSpace(string(out))
-	if result == "" {
-		return "queued", nil
-	}
-	return result, nil
+	return cfg.sendToPrinterOS(ctx, filePath, copies, rawMode)
 }
 
 func writeTempFile(payload []byte, filename string, defaultExt string) (string, error) {
@@ -204,6 +183,52 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		next.ServeHTTP(w, r)
 		log.Printf("%s %s (%s)", r.Method, r.URL.Path, time.Since(start))
+	})
+}
+
+// corsMiddleware permite que el navegador (Bluewine en hosting) llame a este
+// agente local. Sin esto, fetch() falla en el preflight OPTIONS.
+//
+// Si PRINT_AGENT_CORS_ORIGIN viene como lista separada por comas, el
+// middleware compara el Origin entrante y devuelve solo el que matchee.
+func corsMiddleware(next http.Handler, allowOrigin string) http.Handler {
+	allowed := []string{}
+	for _, raw := range strings.Split(allowOrigin, ",") {
+		v := strings.TrimSpace(raw)
+		if v != "" {
+			allowed = append(allowed, v)
+		}
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		allow := ""
+
+		if len(allowed) == 1 && allowed[0] == "*" {
+			allow = "*"
+		} else if origin != "" {
+			for _, a := range allowed {
+				if a == "*" || a == origin {
+					allow = origin
+					break
+				}
+			}
+		}
+
+		if allow != "" {
+			w.Header().Set("Access-Control-Allow-Origin", allow)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Print-Token")
+			w.Header().Set("Access-Control-Max-Age", "600")
+		}
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }
 

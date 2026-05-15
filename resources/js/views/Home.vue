@@ -614,6 +614,7 @@
 import LineChart from "../components/LineChartComponent";
 import PieChart from "../components/PieChartComponent";
 import moment from "moment";
+import { dispatchClientPrint } from "../utils/printAgent";
 
 export default {
   components: {
@@ -740,6 +741,16 @@ export default {
           reason: reason,
           source: 'ADMIN_PANEL',
         });
+
+        if (response.data.client_print) {
+          try {
+            await dispatchClientPrint(response.data.client_print);
+            this.$swal.fire('Reimpresion enviada a impresora local', '', 'success');
+          } catch (err) {
+            this.$swal.fire(err.message || 'No se pudo imprimir en el agente local.', '', 'error');
+          }
+          return;
+        }
 
         if (response.data.agent_dispatched) {
           this.$swal.fire('Reimpresion enviada a impresora local', '', 'success');

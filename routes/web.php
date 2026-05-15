@@ -183,6 +183,8 @@ Route::get('/daily-close-turn', 'Api\DailyBoxController@closeTurn');
 
 // REPORTS
 Route::get('/reports/for/seller', 'Api\ReportsController@index');
+Route::post('/reports/products', 'Api\ReportsController@products');
+Route::post('/reports/products/print', 'Api\ReportsController@productsPrint');
 
 // USERS 
 Route::get('/users', 'Api\UserController@listUsers');

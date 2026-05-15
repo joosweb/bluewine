@@ -26,6 +26,45 @@ class LocalPrintAgentService
         return strtolower((string) config('print_agent.mode', 'raw'));
     }
 
+    public function dispatchMode()
+    {
+        $mode = strtolower((string) config('print_agent.dispatch', 'client'));
+        return in_array($mode, ['client', 'server'], true) ? $mode : 'client';
+    }
+
+    public function isClientDispatch()
+    {
+        return $this->dispatchMode() === 'client';
+    }
+
+    /**
+     * Construye el payload que el navegador enviara al agente local.
+     * Se usa cuando dispatch=client (Laravel vive en hosting y no puede
+     * alcanzar la red local del cajero).
+     *
+     * @param string $binary Bytes del PDF o del ticket ESC/POS.
+     */
+    public function buildClientPayload($binary, $filename = 'voucher.bin', $copies = 1)
+    {
+        if (!$this->isEnabled()) {
+            return null;
+        }
+
+        $mode = $this->mode();
+        $url = $mode === 'pdf'
+            ? (string) config('print_agent.client_url', 'http://127.0.0.1:8765/print/pdf')
+            : (string) config('print_agent.client_raw_url', 'http://127.0.0.1:8765/print/raw');
+
+        return [
+            'agent_url'   => $url,
+            'agent_token' => (string) config('print_agent.token', ''),
+            'mode'        => $mode,
+            'filename'    => $filename,
+            'copies'      => max((int) $copies, 1),
+            'base64_data' => base64_encode($binary),
+        ];
+    }
+
     private function dispatch($url, $binary, $filename, $copies)
     {
         if (!$this->isEnabled()) {

@@ -1576,6 +1576,7 @@ import InfiniteLoading from 'vue-infinite-loading'
 import { Form, HasError, AlertError } from 'vform'
 import Autocomplete from 'vuejs-auto-complete'
 import $ from 'jquery'
+import { dispatchClientPrint } from '../../utils/printAgent'
 
 window.Form = Form
 
@@ -2617,6 +2618,24 @@ export default {
         })
 
         const data = response.data
+
+        // Dispatch desde el navegador (Bluewine en hosting -> agente en 127.0.0.1).
+        if (data.client_print) {
+          try {
+            await dispatchClientPrint(data.client_print)
+            this.$swal.fire({
+              position: 'top-center',
+              icon: 'success',
+              title: 'Voucher enviado a impresora local',
+              showConfirmButton: false,
+              timer: 1500,
+            })
+          } catch (err) {
+            this.$swal.fire(err.message || 'No se pudo imprimir en el agente local.', '', 'error')
+          }
+          return
+        }
+
         if (data.agent_dispatched) {
           this.$swal.fire({
             position: 'top-center',
@@ -2648,7 +2667,18 @@ export default {
             return
           }
 
-          await fetch(data.local_url).then((r) => r.json())
+          // Fallback legacy: pedimos al backend /generar-voucher-local/{id}.
+          // Si el backend ahora corre en modo client_dispatch, devolvera client_print
+          // y lo despachamos desde aqui.
+          const legacy = await fetch(data.local_url).then((r) => r.json())
+          if (legacy && legacy.client_print) {
+            try {
+              await dispatchClientPrint(legacy.client_print)
+            } catch (err) {
+              this.$swal.fire(err.message || 'No se pudo imprimir en el agente local.', '', 'error')
+              return
+            }
+          }
           this.$swal.fire({
             position: 'top-center',
             icon: 'success',
